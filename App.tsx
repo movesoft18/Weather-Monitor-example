@@ -48,7 +48,6 @@ function App() {
           onPress={()=>{
             setUpdatingState(false);
             currTemp = undefined;
-            Loading();
           }}
           title="Обновить"
         />
