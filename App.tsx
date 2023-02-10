@@ -12,8 +12,20 @@ const STATE_DATA_ERROR = 3;
 function App() {
 
   const [updatingDone, setUpdatingState] = useState(STATE_CALCULATE_LOCATION);
-  const currTemp = useRef(undefined);
+  const currWeather = useRef(undefined);
   const location:any  = useRef({});
+
+  function windAngleToDirection(angle: number){
+    if (angle < 22.5) return 'Cев';
+    if (angle < 67.5) return 'C-В';
+    if (angle < 112.5) return 'Вост';
+    if (angle < 157.5) return 'Ю-В';
+    if (angle < 202.5) return 'Юж';
+    if (angle < 247.5) return 'Ю-З';
+    if (angle < 292.5) return 'Зап';
+    if (angle < 337.5) return 'С-З';
+    return 'Сев';
+  }
 
   async function requestLocationPermission() {
     try {
@@ -81,7 +93,7 @@ function App() {
       if (response.ok){
         response.json()
         .then(data=>{
-          currTemp.current = data.main.temp;
+          currWeather.current = data;
           setUpdatingState(STATE_DATA_LOADED);
         });
       }
@@ -129,17 +141,23 @@ function App() {
   function LoadedView(){
     return (
       <View style = {styles.container}>
-        <View
-          style={styles.infoScreen}>
-          <Text style ={styles.textStyle}>{currTemp.current === undefined ? 'Ошибка' : currTemp.current + ' °C'}</Text>
+        <View style={styles.infoScreen}>
+          <ScreenRow param = {'Местоположение:'} value = {currWeather.current.name}/>
+          <ScreenRow param = {'Температура:'} value = {currWeather.current.main.temp + ' °C'}/>
+          <ScreenRow param = {'По ощущению:'} value = {currWeather.current.main.feels_like + ' °C'}/>
+          <ScreenRow param = {'Влажность:'} value = {currWeather.current.main.humidity + ' %'}/>
+          <ScreenRow param = {'Небо:'} value = {currWeather.current.weather[0].description}/>
+          <ScreenRow param = {'Облачность:'} value = {currWeather.current.clouds.all + ' %'}/>
+          <ScreenRow param = {'Давление'} value = {currWeather.current.main.pressure * 0.75 + ' мм. рт. ст.'}/>
+          <ScreenRow param = {'Видимость:'} value = {currWeather.current.visibility + ' м.'}/>
+          <ScreenRow param = {'Ветер:'} value = {currWeather.current.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.current.wind.deg)}/>
         </View>
-        <View
-          style ={styles.buttonStyle}
+        <View style ={styles.buttonStyle}
           >
           <Button
               onPress={()=>{
                 setUpdatingState(STATE_CALCULATE_LOCATION);
-                currTemp.current = undefined;
+                currWeather.current = undefined;
               }}
               title="Обновить"
             />
@@ -148,6 +166,18 @@ function App() {
     );
   }
 
+  function ScreenRow(props: any){
+    return (
+      <View style={styles.paramRow}>
+        <View style={styles.paramName}>
+          <Text style ={styles.textParamStyle}>{props.param}</Text>
+        </View>
+        <View style={styles.paramValue}>
+        <Text style ={styles.textValueStyle}>{props.value}</Text>
+        </View>
+      </View>
+    );
+  }
 
   switch (updatingDone) {
     case STATE_CALCULATE_LOCATION:
@@ -191,4 +221,34 @@ const styles = StyleSheet.create({
   textStyle: {
     fontSize: 24,
   },
+
+  paramRow: {
+    height: '10%',
+    flexDirection: 'row',
+  },
+
+  paramName: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: 10,
+    paddingLeft: 10,
+  },
+
+  paramValue: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingRight: 10,
+    paddingLeft: 10,
+  },
+
+  textValueStyle: {
+    fontSize: 18,
+    color: 'black',
+  },
+
+  textParamStyle: {
+    fontSize: 18,
+    color: 'gray',
+  },
+
 });
