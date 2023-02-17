@@ -1,21 +1,35 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable react-native/no-inline-styles */
 import React, {useState, useRef, useEffect} from 'react';
-import {PermissionsAndroid, StyleSheet, Text, Button, View} from 'react-native';
+import {PermissionsAndroid, StyleSheet, Text, Button, View, } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import ScreenRow from '../Components/ScreenRow';
-import {LoadingView, ErrorView, CalculateLocation} from './MainScreenStates';
+import SelectPositionBar from '../Components/selectposition';
+import {LoadingView, ErrorView, CalculateLocation, LoadingFromStorageView} from './MainScreenStates';
+import {storage} from '../store/storage';
 
-const STATE_CALCULATE_LOCATION = 0;
-const STATE_LOADING_DATA = 1;
-const STATE_DATA_LOADED = 2;
-const STATE_DATA_ERROR = 3;
+export const STATE_LOADING_FROM_STORAGE = 0;
+export const STATE_CALCULATE_LOCATION = 1;
+export const STATE_LOADING_DATA = 2;
+export const STATE_DATA_LOADED = 3;
+export const STATE_DATA_ERROR = 4;
+export const STATE_DATA_EMPTY = 5;
 
-function MainScreen() {
 
-  const [updatingDone, setUpdatingState] = useState(STATE_CALCULATE_LOCATION);
-  const currWeather = useRef(undefined);
-  const location  = useRef({});
+function MainScreen({navigation, route}) {
+
+  const [useCurrentPosition, setUseCurrentPosition] = useState(true);
+
+  const [dataState, setUpdatingState] = useState({
+    state: STATE_LOADING_FROM_STORAGE,
+    currWeather: null,
+    position: {
+      lat: 50,
+      lon: 50,
+    },
+  });
+  //const currWeather = useRef(undefined);
+  //const location  = useRef({});
 
   function windAngleToDirection(angle){
     if (angle < 22.5) return 'Cев';
@@ -62,19 +76,16 @@ function MainScreen() {
         Geolocation.getCurrentPosition(
           position => {
             console.log(position);
-            location.current = position;
-            setUpdatingState(STATE_LOADING_DATA);
+            setUpdatingState({...dataState, state: STATE_LOADING_DATA, position: {lat: position.coords.latitude, lon: position.coords.longitude}});
           },
           error => {
             console.log(error.code, error.message);
-            location.current = undefined;
-            setUpdatingState(STATE_DATA_ERROR);
+            setUpdatingState({...dataState, state: STATE_DATA_ERROR});
           },
           {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
         );
       }
     });
-    console.log(location);
   };
 
   async function fetchWithTimeout(resource, options = {}) {
@@ -89,50 +100,117 @@ function MainScreen() {
     return response;
   }
 
-  function loadingData(){
-    fetchWithTimeout(`http://api.openweathermap.org/data/2.5/weather?lat=${location.current.coords.latitude}&lon=${location.current.coords.longitude}&units=metric&lang=ru&APPID=df970160e8498542cb823c972d5a8b35`)
+  async function loadingFromStorage(){
+    if (!useCurrentPosition){
+      try {
+        let ret = await storage.load({key: 'mapPosition', id: '1'});
+        console.log(ret);
+        setUpdatingState({state: STATE_LOADING_DATA, currWeather: null, position: ret});
+      } catch (err) {
+        console.warn(err.message);
+        setUpdatingState({...dataState, state: STATE_DATA_EMPTY});
+      }
+    } else {
+      setUpdatingState({...dataState, state: STATE_CALCULATE_LOCATION});
+    }
+  }
+
+  function loadingData(pos){
+    fetchWithTimeout(`http://api.openweathermap.org/data/2.5/weather?lat=${pos.lat}&lon=${pos.lon}&units=metric&lang=ru&APPID=df970160e8498542cb823c972d5a8b35`)
     .then((response)=>{
       if (response.ok){
         response.json()
         .then(data=>{
-          currWeather.current = data;
-          setUpdatingState(STATE_DATA_LOADED);
+          setUpdatingState({...dataState, state: STATE_DATA_LOADED, currWeather: data});
         });
       }
     })
     .catch(
-      (error) => setUpdatingState(STATE_DATA_ERROR)
+      (error) => setUpdatingState({...dataState, state: STATE_DATA_ERROR, currWeather: null})
     );
   }
 
-  useEffect(()=> {
-    if (updatingDone === STATE_CALCULATE_LOCATION) {
-      getLocation();
-    } else if (updatingDone === STATE_LOADING_DATA) {
-      loadingData();
+  useEffect(()=>{
+    if (route.params?.position !== undefined)
+    {
+      // записать новые координаты в хранилище
+      storage.save({
+        key: 'mapPosition',
+        id: '1',
+        data: route.params?.position,
+      });
+      setUpdatingState({...dataState, state: STATE_LOADING_FROM_STORAGE});
+      route.params.position = undefined;
     }
-  },[updatingDone]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[route.params?.position]);
+
+  useEffect(()=> {
+    if (dataState.state === STATE_LOADING_FROM_STORAGE){
+      loadingFromStorage();
+    } else if (dataState.state === STATE_CALCULATE_LOCATION){
+      getLocation();
+    } else if (dataState.state === STATE_LOADING_DATA){
+      loadingData(dataState.position);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    },[dataState]);
+
+    function emptyDataView(){
+      return (
+        <View style = {styles.container}>
+          <SelectPositionBar
+            navigation = {navigation}
+            position = {dataState.position}
+            useCurrentPos = {useCurrentPosition}
+            setCurrentPosHandler = {setUseCurrentPosition}
+          />
+          <View
+            style={styles.infoScreen}>
+            <Text style ={styles.textValueStyle}>Не определена позиция. Используйте свое местоположение или выберите точку на карте</Text>
+         </View>
+          <View
+            style ={styles.buttonStyle}
+            >
+            <Button
+                onPress={()=>{
+                  setUpdatingState({state: STATE_CALCULATE_LOCATION, currWeather: null});
+                  //currWeather = undefined;
+                }}
+                title="Обновить"
+              />
+          </View>
+        </View>
+      );
+    }
+
 
   function loadedView(){
+    let currWeather = dataState.currWeather;
     return (
       <View style = {styles.container}>
+        <SelectPositionBar
+          navigation = {navigation}
+          position = {dataState.position}
+          useCurrentPos = {useCurrentPosition}
+          setCurrentPosHandler = {setUseCurrentPosition}
+        />
         <View style={styles.infoScreen}>
-          <ScreenRow param = {'Местоположение:'} value = {currWeather.current.name}/>
-          <ScreenRow param = {'Температура:'} value = {currWeather.current.main.temp + ' °C'}/>
-          <ScreenRow param = {'По ощущению:'} value = {currWeather.current.main.feels_like + ' °C'}/>
-          <ScreenRow param = {'Влажность:'} value = {currWeather.current.main.humidity + ' %'}/>
-          <ScreenRow param = {'Небо:'} value = {currWeather.current.weather[0].description}/>
-          <ScreenRow param = {'Облачность:'} value = {currWeather.current.clouds.all + ' %'}/>
-          <ScreenRow param = {'Давление'} value = {currWeather.current.main.pressure * 0.75 + ' мм. рт. ст.'}/>
-          <ScreenRow param = {'Видимость:'} value = {currWeather.current.visibility + ' м.'}/>
-          <ScreenRow param = {'Ветер:'} value = {currWeather.current.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.current.wind.deg)}/>
+          <ScreenRow param = {'Местоположение:'} value = {currWeather.name}/>
+          <ScreenRow param = {'Температура:'} value = {currWeather.main.temp + ' °C'}/>
+          <ScreenRow param = {'По ощущению:'} value = {currWeather.main.feels_like + ' °C'}/>
+          <ScreenRow param = {'Влажность:'} value = {currWeather.main.humidity + ' %'}/>
+          <ScreenRow param = {'Небо:'} value = {currWeather.weather[0].description}/>
+          <ScreenRow param = {'Облачность:'} value = {currWeather.clouds.all + ' %'}/>
+          <ScreenRow param = {'Давление'} value = {currWeather.main.pressure * 0.75 + ' мм. рт. ст.'}/>
+          <ScreenRow param = {'Видимость:'} value = {currWeather.visibility + ' м.'}/>
+          <ScreenRow param = {'Ветер:'} value = {currWeather.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.wind.deg)}/>
         </View>
         <View style ={styles.buttonStyle}
           >
           <Button
               onPress={()=>{
-                setUpdatingState(STATE_CALCULATE_LOCATION);
-                currWeather.current = undefined;
+                setUpdatingState({...dataState, state: STATE_LOADING_FROM_STORAGE});
               }}
               title="Обновить"
             />
@@ -141,13 +219,17 @@ function MainScreen() {
     );
   }
 
-  switch (updatingDone) {
+  switch (dataState.state) {
+    case STATE_LOADING_FROM_STORAGE:
+      return <LoadingFromStorageView/>;
     case STATE_CALCULATE_LOCATION:
       return <CalculateLocation/>;
     case STATE_LOADING_DATA:
       return <LoadingView/>;
     case STATE_DATA_LOADED:
       return loadedView();
+    case STATE_DATA_EMPTY:
+      return emptyDataView();
     case STATE_DATA_ERROR:
       return <ErrorView/>;
   }
@@ -177,5 +259,4 @@ const styles = StyleSheet.create({
   textStyle: {
     fontSize: 24,
   },
-
 });
