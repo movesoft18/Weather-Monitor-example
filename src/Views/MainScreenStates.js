@@ -3,17 +3,6 @@ import React  from 'react';
 import {StyleSheet, View, Text, ActivityIndicator} from 'react-native';
 import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
 
-/*export function LoadingView() {
-    return (
-      <SkeletonPlaceholder borderRadius={4}>
-        <View
-        style={styles.awaitLoading}>
-        <Text>Обновление данных...</Text>
-      </View>
-    </SkeletonPlaceholder>
-    );
-  }*/
-
 
   export function LoadingView() {
     return (
@@ -76,15 +65,6 @@ import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
     );
   }
 
-  export function ErrorView() {
-    return (
-      <View
-      style={styles.awaitLoading}>
-      <ActivityIndicator size="large" />
-      <Text>Ошибка...</Text>
-    </View>
-    );
-  }
 
   export function LoadingFromStorageView(){
     return (

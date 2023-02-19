@@ -1,49 +1,88 @@
 /* eslint-disable prettier/prettier */
-import React, {useState,} from 'react';
-import {StyleSheet, Text, Button, View, Switch, } from 'react-native';
+import React from 'react';
+import {StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 
 
 export default function SelectPositionBar({navigation, position, useCurrentPos, setCurrentPosHandler}){
-  //const [isEnabled, setIsEnabled] = useState(useCurrentPos);
-
-  return (
-    <View style={styles.settingsBar}>
-      <View style={{flex:25, flexDirection:'row', alignItems: 'center',}}>
-        <Switch
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          onValueChange={()=>{
-            //setIsEnabled(previousState => !previousState);
-            setCurrentPosHandler(previousState => !previousState);
-          }}
-          value={useCurrentPos}
-          />
-          <Text style={styles.myPosSwitchText}>Использовать мою позицию</Text>
-      </View>
-      <View style={{flex:15, flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
-        {!useCurrentPos &&
-          <Button
-            onPress={()=>{
-              navigation.navigate('Map', {position: position});
-            }}
-            title="Карта"
-          />
-        }
-      </View>
-    </View>
-  );
-}
-
   const styles = StyleSheet.create({
 
     settingsBar: {
         flex: 1,
         flexDirection:'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        alignContent: 'space-between',
       },
 
-      myPosSwitchText:{
-        fontSize: 12,
+      myPositionView: {
+
+        flex:1,
+        flexDirection:'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+
+      myPositionButton: {
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 20,
+        backgroundColor: useCurrentPos ? '#4682B4' : 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '95%',
+        height: '70%',
+      },
+
+      myPositionButtonText:{
+        //fontSize: 12,
+        color: useCurrentPos ? 'white' : 'black',
+      },
+
+      mapView: {
+        flex:1,
+        flexDirection:'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+
+      mapButton: {
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 20,
+        backgroundColor: !useCurrentPos ? '#4682B4' : 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '95%',
+        height: '70%',
+      },
+
+      mapButtonText:{
+        //fontSize: 12,
+        color: !useCurrentPos ? 'white' : 'black',
       },
   });
+
+  return (
+    <View style={styles.settingsBar}>
+      <View style={styles.myPositionView}>
+        <TouchableOpacity
+          style={styles.myPositionButton}
+          onPress={()=>{
+            setCurrentPosHandler(true);
+          }}
+        >
+          <Text style = {styles.myPositionButtonText}>Мое местоположение</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.mapView}>
+        <TouchableOpacity
+          style={styles.mapButton}
+          onPress={()=>{
+            setCurrentPosHandler(false);
+            navigation.navigate('Map', {position: position});
+          }}
+        >
+          <Text style = {styles.mapButtonText}>Место на карте</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+

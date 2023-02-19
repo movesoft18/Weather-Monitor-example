@@ -1,12 +1,13 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable react-native/no-inline-styles */
 import React, {useState, useRef, useEffect} from 'react';
-import {PermissionsAndroid, StyleSheet, Text, Button, View, } from 'react-native';
+import {PermissionsAndroid, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import ScreenRow from '../Components/ScreenRow';
 import SelectPositionBar from '../Components/selectposition';
-import {LoadingView, ErrorView, CalculateLocation, LoadingFromStorageView} from './MainScreenStates';
+import {LoadingView, CalculateLocation, LoadingFromStorageView} from './MainScreenStates';
 import {storage} from '../store/storage';
+import { weatherImages } from '../const/imagesTags';
 
 export const STATE_LOADING_FROM_STORAGE = 0;
 export const STATE_CALCULATE_LOCATION = 1;
@@ -18,6 +19,20 @@ export const STATE_DATA_EMPTY = 5;
 
 function MainScreen({navigation, route}) {
 
+  const errors = useRef(
+    {
+      locationError: {
+        active: false,
+        message: '',
+      },
+      networkError: {
+        active: false,
+        message: '',
+        responseCode: 0,
+      },
+    }
+  );
+
   const [useCurrentPosition, setUseCurrentPosition] = useState(true);
 
   const [dataState, setUpdatingState] = useState({
@@ -28,8 +43,6 @@ function MainScreen({navigation, route}) {
       lon: 50,
     },
   });
-  //const currWeather = useRef(undefined);
-  //const location  = useRef({});
 
   function windAngleToDirection(angle){
     if (angle < 22.5) return 'Cев';
@@ -68,25 +81,30 @@ function MainScreen({navigation, route}) {
     }
   }
 
-  function getLocation () {
-    const result = requestLocationPermission();
-    result.then(res => {
-      console.log('Результат:', res);
-      if (res) {
+  async function getLocation() {
+    if (useCurrentPosition) {
+      const result = await requestLocationPermission();
+      if (result){
         Geolocation.getCurrentPosition(
           position => {
             console.log(position);
+            errors.current.locationError.active = false;
             setUpdatingState({...dataState, state: STATE_LOADING_DATA, position: {lat: position.coords.latitude, lon: position.coords.longitude}});
           },
           error => {
+            // See error code charts below.
             console.log(error.code, error.message);
+            errors.current.locationError.active = true;
+            errors.current.locationError.message = error.message;
             setUpdatingState({...dataState, state: STATE_DATA_ERROR});
           },
           {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
         );
       }
-    });
-  };
+    } else {
+      setUpdatingState({...dataState, state: STATE_LOADING_DATA});
+    }
+  }
 
   async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options;
@@ -115,19 +133,25 @@ function MainScreen({navigation, route}) {
     }
   }
 
-  function loadingData(pos){
-    fetchWithTimeout(`http://api.openweathermap.org/data/2.5/weather?lat=${pos.lat}&lon=${pos.lon}&units=metric&lang=ru&APPID=df970160e8498542cb823c972d5a8b35`)
-    .then((response)=>{
-      if (response.ok){
-        response.json()
-        .then(data=>{
-          setUpdatingState({...dataState, state: STATE_DATA_LOADED, currWeather: data});
-        });
+  async function loadingData(pos){
+    errors.current.networkError.active = false;
+    try {
+      let response = await fetchWithTimeout(`http://api.openweathermap.org/data/2.5/weather?lat=${pos.lat}&lon=${pos.lon}&units=metric&lang=ru&APPID=df970160e8498542cb823c972d5a8b35`, { timeout: 10000 });
+      errors.current.networkError.responseCode = response.status;
+      if (response.ok) {
+        let data = await response.json();
+        console.log(data);
+        setUpdatingState({...dataState, state: STATE_DATA_LOADED, currWeather: data});
+      } else {
+        errors.current.networkError.active = true;
+        errors.current.networkError.message = 'Invalid server response';
+        setUpdatingState({...dataState, state: STATE_DATA_ERROR, currWeather: null});
       }
-    })
-    .catch(
-      (error) => setUpdatingState({...dataState, state: STATE_DATA_ERROR, currWeather: null})
-    );
+    } catch (error){
+      errors.current.networkError.active = true;
+      errors.current.networkError.message = error.message;
+      setUpdatingState({...dataState, state: STATE_DATA_ERROR, currWeather: null});
+    }
   }
 
   useEffect(()=>{
@@ -156,31 +180,25 @@ function MainScreen({navigation, route}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     },[dataState]);
 
-    function emptyDataView(){
+
+    function errorView() {
       return (
-        <View style = {styles.container}>
-          <SelectPositionBar
-            navigation = {navigation}
-            position = {dataState.position}
-            useCurrentPos = {useCurrentPosition}
-            setCurrentPosHandler = {setUseCurrentPosition}
-          />
-          <View
-            style={styles.infoScreen}>
-            <Text style ={styles.textValueStyle}>Не определена позиция. Используйте свое местоположение или выберите точку на карте</Text>
-         </View>
-          <View
-            style ={styles.buttonStyle}
-            >
-            <Button
-                onPress={()=>{
-                  setUpdatingState({state: STATE_CALCULATE_LOCATION, currWeather: null});
-                  //currWeather = undefined;
-                }}
-                title="Обновить"
-              />
-          </View>
-        </View>
+        <View
+        style={styles.infoScreen}>
+        <Image style={styles.errorImageStyle} source={require('../assets/icons/error.png')}/>
+        <Text>Ошибка...</Text>
+        { errors.current.locationError.active &&
+          <Text>
+            Не определено ваше местоположение. Возможно выключена геолокация. 
+            Исправьте это и повторите попытку.
+            {errors.current.locationError.message}
+          </Text>}
+        { errors.current.networkError.active &&
+          <Text>
+            Ошибка сети: {errors.current.networkError.message}
+            {errors.current.networkError.responseCode > 299 ? errors.current.networkError.responseCode : ''}
+          </Text>}
+      </View>
       );
     }
 
@@ -195,25 +213,39 @@ function MainScreen({navigation, route}) {
           useCurrentPos = {useCurrentPosition}
           setCurrentPosHandler = {setUseCurrentPosition}
         />
-        <View style={styles.infoScreen}>
-          <ScreenRow param = {'Местоположение:'} value = {currWeather.name}/>
-          <ScreenRow param = {'Температура:'} value = {currWeather.main.temp + ' °C'}/>
-          <ScreenRow param = {'По ощущению:'} value = {currWeather.main.feels_like + ' °C'}/>
-          <ScreenRow param = {'Влажность:'} value = {currWeather.main.humidity + ' %'}/>
-          <ScreenRow param = {'Небо:'} value = {currWeather.weather[0].description}/>
-          <ScreenRow param = {'Облачность:'} value = {currWeather.clouds.all + ' %'}/>
-          <ScreenRow param = {'Давление'} value = {currWeather.main.pressure * 0.75 + ' мм. рт. ст.'}/>
-          <ScreenRow param = {'Видимость:'} value = {currWeather.visibility + ' м.'}/>
-          <ScreenRow param = {'Ветер:'} value = {currWeather.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.wind.deg)}/>
-        </View>
-        <View style ={styles.buttonStyle}
-          >
-          <Button
-              onPress={()=>{
-                setUpdatingState({...dataState, state: STATE_LOADING_FROM_STORAGE});
+        {
+          dataState.state === STATE_DATA_EMPTY ?
+            <View
+              style={styles.infoScreen}>
+              <Text style ={styles.textValueStyle}>Не определена позиция. Используйте свое местоположение или выберите точку на карте</Text>
+          </View>
+          :
+            (dataState.state === STATE_DATA_ERROR) ?
+              errorView()
+            :
+              <View style={styles.infoScreen}>
+                <ScreenRow param = {'Широта:'} value = {currWeather.coord.lat} icon = {weatherImages.lat}/>
+                <ScreenRow param = {'Долгота:'} value = {currWeather.coord.lon} icon = {weatherImages.lon}/>
+                <ScreenRow param = {'Местоположение:'} value = {currWeather.name} icon = {weatherImages.position}/>
+                <ScreenRow param = {'Температура:'} value = {currWeather.main.temp + ' °C'} icon = {weatherImages.temperature}/>
+                <ScreenRow param = {'По ощущению:'} value = {currWeather.main.feels_like + ' °C'} icon = {weatherImages.sens}/>
+                <ScreenRow param = {'Влажность:'} value = {currWeather.main.humidity + ' %'} icon = {weatherImages.humidity}/>
+                <ScreenRow param = {'Небо:'} value = {currWeather.weather[0].description} icon = {weatherImages.sky}/>
+                <ScreenRow param = {'Облачность:'} value = {currWeather.clouds.all + ' %'} icon = {weatherImages.clouds}/>
+                <ScreenRow param = {'Давление'} value = {currWeather.main.pressure * 0.75 + ' мм. рт. ст.'} icon = {weatherImages.pressure}/>
+                <ScreenRow param = {'Видимость:'} value = {currWeather.visibility + ' м.'} icon = {weatherImages.visibility}/>
+                <ScreenRow param = {'Ветер:'} value = {currWeather.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.wind.deg)} icon = {weatherImages.wind}/>
+              </View>
+        }
+        <View style ={styles.buttonView}>
+          <TouchableOpacity
+            style ={styles.buttonStyle}
+            onPress={()=>{
+              setUpdatingState({...dataState, state: STATE_LOADING_FROM_STORAGE});
               }}
-              title="Обновить"
-            />
+          >
+            <Text>Обновить</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -227,11 +259,9 @@ function MainScreen({navigation, route}) {
     case STATE_LOADING_DATA:
       return <LoadingView/>;
     case STATE_DATA_LOADED:
-      return loadedView();
     case STATE_DATA_EMPTY:
-      return emptyDataView();
     case STATE_DATA_ERROR:
-      return <ErrorView/>;
+      return loadedView();
   }
 
 }
@@ -241,7 +271,8 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexDirection: 'column',
   },
 
@@ -251,12 +282,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  buttonStyle: {
+  buttonView: {
     flex: 1,
-    justifyContent: 'flex-end',
+    alignItems: "center",
+    justifyContent: 'center',
+  },
+
+  buttonStyle: {
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    alignItems: "center",
+    justifyContent: 'center',
+    width: '80%',
+    height: '70%',
+
   },
 
   textStyle: {
     fontSize: 24,
+  },
+
+  errorImageStyle: {
+    resizeMode: 'center',
+    width: '50%',
+    height: '50%',
   },
 });
