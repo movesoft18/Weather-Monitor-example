@@ -1,4 +1,5 @@
 {
   "name": "WeatherMonitor",
-  "displayName": "WeatherMonitor"
+  "displayName": "WeatherMonitor",
+  "orientation": "portrait"
 }

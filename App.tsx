@@ -4,7 +4,7 @@ import React from 'react';
 import Navigate from './src/Components/navigate';
 import YaMap from 'react-native-yamap';
 
-YaMap.init('API Key');
+YaMap.init('Your API Key');
 YaMap.setLocale('ru_RU');
 
 

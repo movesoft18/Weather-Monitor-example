@@ -22,15 +22,15 @@ export default function ScreenRow(props){
   const styles = StyleSheet.create({
 
     paramRow: {
-      height: '9%',
+      height: 45,
       flexDirection: 'row',
+      //borderColor: 'black',
+      //borderWidth: 1,
     },
 
     paramIcon: {
       flex: 2,
-      //borderEndColor: 'black',
-      //borderWidth: 1,
-      //paddingLeft: 5,
+      paddingLeft: 5,
       justifyContent: 'center',
     },
 

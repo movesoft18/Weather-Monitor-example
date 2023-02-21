@@ -1,9 +1,10 @@
 /* eslint-disable prettier/prettier */
 import React from 'react';
-import {StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import {StyleSheet, Text, View, TouchableOpacity} from 'react-native';
 
 
 export default function SelectPositionBar({navigation, position, useCurrentPos, setCurrentPosHandler}){
+
   const styles = StyleSheet.create({
 
     settingsBar: {
@@ -14,7 +15,7 @@ export default function SelectPositionBar({navigation, position, useCurrentPos, 
       myPositionView: {
 
         flex:1,
-        flexDirection:'row',
+        //flexDirection:'row',
         alignItems: 'center',
         justifyContent: 'center',
       },
@@ -37,7 +38,7 @@ export default function SelectPositionBar({navigation, position, useCurrentPos, 
 
       mapView: {
         flex:1,
-        flexDirection:'row',
+        //flexDirection:'row',
         alignItems: 'center',
         justifyContent: 'center',
       },

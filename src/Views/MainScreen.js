@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable react-native/no-inline-styles */
 import React, {useState, useRef, useEffect} from 'react';
-import {PermissionsAndroid, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import {PermissionsAndroid, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, useWindowDimensions } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import ScreenRow from '../Components/ScreenRow';
 import SelectPositionBar from '../Components/selectposition';
@@ -15,6 +15,64 @@ export const STATE_LOADING_DATA = 2;
 export const STATE_DATA_LOADED = 3;
 export const STATE_DATA_ERROR = 4;
 export const STATE_DATA_EMPTY = 5;
+
+const weatherDataList = [
+  {
+    key: 1,
+    icon: weatherImages.lat,
+    title: 'Широта:',
+  },
+  {
+    key: 2,
+    icon: weatherImages.lon,
+    title: 'Долгота:',
+  },
+  {
+    key: 3,
+    icon: weatherImages.position,
+    title: 'Местоположение:',
+  },
+  {
+    key: 4,
+    icon: weatherImages.temperature,
+    title: 'Температура:',
+  },
+  {
+    key: 5,
+    icon: weatherImages.sens,
+    title: 'По ощущению:',
+  },
+  {
+    key: 6,
+    icon: weatherImages.humidity,
+    title: 'Влажность:',
+  },
+  {
+    key: 7,
+    icon: weatherImages.sky,
+    title: 'Небо:',
+  },
+  {
+    key: 8,
+    icon: weatherImages.clouds,
+    title: 'Облачность:',
+  },
+  {
+    key: 9,
+    icon: weatherImages.pressure,
+    title: 'Давление:',
+  },
+  {
+    key: 10,
+    icon: weatherImages.visibility,
+    title: 'Видимость:',
+  },
+  {
+    key: 11,
+    icon: weatherImages.wind,
+    title: 'Ветер:',
+  },
+];
 
 
 function MainScreen({navigation, route}) {
@@ -43,6 +101,8 @@ function MainScreen({navigation, route}) {
       lon: 50,
     },
   });
+
+  const screen = useWindowDimensions();
 
   function windAngleToDirection(angle){
     if (angle < 22.5) return 'Cев';
@@ -202,17 +262,33 @@ function MainScreen({navigation, route}) {
       );
     }
 
+    function getWeatherParams(data, weather) {
+      data[0].value = weather.coord.lat;
+      data[1].value = weather.coord.lon;
+      data[2].value = weather.name;
+      data[3].value = weather.main.temp + ' °C';
+      data[4].value = weather.main.feels_like + ' °C';
+      data[5].value = weather.main.humidity + ' %';
+      data[6].value = weather.weather[0].description;
+      data[7].value = weather.clouds.all + ' %';
+      data[8].value = weather.main.pressure * 0.75 + ' мм. рт. ст.';
+      data[9].value = weather.visibility + ' м.';
+      data[10].value = weather.wind.speed + ' м/сек - ' + windAngleToDirection(weather.wind.deg);
+      return data;
+    }
 
   function loadedView(){
     let currWeather = dataState.currWeather;
     return (
       <View style = {styles.container}>
+      <View style = {{flex : screen.width > screen.height ? 2 : 1}}>
         <SelectPositionBar
           navigation = {navigation}
           position = {dataState.position}
           useCurrentPos = {useCurrentPosition}
           setCurrentPosHandler = {setUseCurrentPosition}
         />
+      </View>
         {
           dataState.state === STATE_DATA_EMPTY ?
             <View
@@ -224,20 +300,19 @@ function MainScreen({navigation, route}) {
               errorView()
             :
               <View style={styles.infoScreen}>
-                <ScreenRow param = {'Широта:'} value = {currWeather.coord.lat} icon = {weatherImages.lat}/>
-                <ScreenRow param = {'Долгота:'} value = {currWeather.coord.lon} icon = {weatherImages.lon}/>
-                <ScreenRow param = {'Местоположение:'} value = {currWeather.name} icon = {weatherImages.position}/>
-                <ScreenRow param = {'Температура:'} value = {currWeather.main.temp + ' °C'} icon = {weatherImages.temperature}/>
-                <ScreenRow param = {'По ощущению:'} value = {currWeather.main.feels_like + ' °C'} icon = {weatherImages.sens}/>
-                <ScreenRow param = {'Влажность:'} value = {currWeather.main.humidity + ' %'} icon = {weatherImages.humidity}/>
-                <ScreenRow param = {'Небо:'} value = {currWeather.weather[0].description} icon = {weatherImages.sky}/>
-                <ScreenRow param = {'Облачность:'} value = {currWeather.clouds.all + ' %'} icon = {weatherImages.clouds}/>
-                <ScreenRow param = {'Давление'} value = {currWeather.main.pressure * 0.75 + ' мм. рт. ст.'} icon = {weatherImages.pressure}/>
-                <ScreenRow param = {'Видимость:'} value = {currWeather.visibility + ' м.'} icon = {weatherImages.visibility}/>
-                <ScreenRow param = {'Ветер:'} value = {currWeather.wind.speed + ' м/сек - ' + windAngleToDirection(currWeather.wind.deg)} icon = {weatherImages.wind}/>
+                <FlatList
+                  data = {getWeatherParams(weatherDataList, currWeather)}
+                  renderItem = {({item}) =>
+                    <ScreenRow
+                      param = {item.title}
+                      value = {item.value}
+                      icon = {item.icon}
+                    />
+                  }
+                />
               </View>
         }
-        <View style ={styles.buttonView}>
+        <View style ={[styles.buttonView, {flex : screen.width > screen.height ? 2 : 1}]}>
           <TouchableOpacity
             style ={styles.buttonStyle}
             onPress={()=>{
@@ -276,15 +351,19 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
 
+  selectPositionView: {
+    flex: 1,
+    borderColor: 'black',
+    borderWidth: 1,
+  },
+
   infoScreen: {
     flex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
   buttonView: {
-    flex: 1,
-    alignItems: "center",
+    //flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
   },
 
@@ -293,11 +372,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 20,
     backgroundColor: '#ffffff',
-    alignItems: "center",
+    alignItems: 'center',
     justifyContent: 'center',
     width: '80%',
     height: '70%',
-
   },
 
   textStyle: {
